@@ -109,7 +109,7 @@ import { parseComposerContextHref } from "@t3tools/shared/composerContextReferen
 import { parseThreadLinkHref } from "@t3tools/shared/threadLinks";
 import { AssistantCitationChip } from "./chat/AssistantCitationChip";
 import { MarkdownThreadLink } from "./chat/MarkdownThreadLink";
-import { mathKind, mayContainMath } from "@t3tools/shared/markdownMath";
+import { mathKind } from "@t3tools/shared/markdownMath";
 import remarkMath from "remark-math";
 import {
   artifactTemplateFromHastProperties,
@@ -402,24 +402,6 @@ function orderedListGutterStyle(
   const markerWidth = Math.max(String(firstNumber).length, String(lastNumber).length);
   if (markerWidth <= 1) return undefined;
   return { "--list-gutter": `${markerWidth + 2}ch` };
-}
-
-const CHAT_MARKDOWN_MATH_REMARK_PLUGINS: NonNullable<ReactMarkdownOptions["remarkPlugins"]> = [
-  [remarkMath, { singleDollarTextMath: true }],
-  ...CHAT_MARKDOWN_REMARK_PLUGINS,
-];
-
-const CHAT_MARKDOWN_MATH_REMARK_PLUGINS_WITH_BREAKS: NonNullable<
-  ReactMarkdownOptions["remarkPlugins"]
-> = [[remarkMath, { singleDollarTextMath: true }], ...CHAT_MARKDOWN_REMARK_PLUGINS_WITH_BREAKS];
-
-function chatMarkdownRemarkPlugins(lineBreaks: boolean, math: boolean) {
-  if (math) {
-    return lineBreaks
-      ? CHAT_MARKDOWN_MATH_REMARK_PLUGINS_WITH_BREAKS
-      : CHAT_MARKDOWN_MATH_REMARK_PLUGINS;
-  }
-  return lineBreaks ? CHAT_MARKDOWN_REMARK_PLUGINS_WITH_BREAKS : CHAT_MARKDOWN_REMARK_PLUGINS;
 }
 
 const GITHUB_ALERT_PRESENTATIONS: Record<
@@ -2566,6 +2548,7 @@ function useChatMarkdownState({
   // synchronously whether to intercept its `_blank`, and a subscription is what
   // makes a persisted "app" apply once settings hydrate after launch.
   const linkTargetPreference = useClientSettings((settings) => settings.browserLinkTarget);
+  const mathEnabled = useClientSettings((settings) => settings.mathRenderingEnabled);
   const resolveThreadPullRequest = (
     href: string,
   ): (ThreadPullRequestKey & { readonly url: string }) | null => {
@@ -2780,6 +2763,7 @@ function useChatMarkdownState({
     workspaceMutationId,
     inlineCodeFileLinkMetaByText,
     inline,
+    mathEnabled,
     isStreaming,
     linkTargetPreference,
     markdownFileLinkMetaByHref,
@@ -3197,9 +3181,18 @@ const CHAT_MARKDOWN_COMPONENTS = {
     );
   },
   code: function MarkdownCode({ node, children, className, ...props }) {
-    const { cwd, imageBaseDir, inlineCodeFileLinkMetaByText, fileLinkChip } = use(
-      ChatMarkdownRendererContext,
-    );
+    const { cwd, imageBaseDir, inlineCodeFileLinkMetaByText, fileLinkChip, mathEnabled, inline } =
+      use(ChatMarkdownRendererContext);
+    const math = mathEnabled ? mathKind(className) : null;
+    if (math) {
+      return (
+        <MarkdownMath
+          tex={nodeToPlainText(children)}
+          display={math === "display"}
+          focusable={!inline}
+        />
+      );
+    }
     if (node?.properties?.dataInlineCode != null) {
       const codeText = nodeToPlainText(children);
       const fileLinkMeta =
@@ -3353,9 +3346,15 @@ const CHAT_MARKDOWN_COMPONENTS = {
     return <MarkdownDetails open={detailsOpen}>{children}</MarkdownDetails>;
   },
   pre: function MarkdownPre({ node, children, ...props }) {
-    const mathEnabled = useClientSettings((settings) => settings.mathRenderingEnabled);
-    const { resolvedTheme, diffThemeName, expandMedia, isStreaming, onRunShellCommand, inline } =
-      use(ChatMarkdownRendererContext);
+    const {
+      resolvedTheme,
+      diffThemeName,
+      expandMedia,
+      isStreaming,
+      onRunShellCommand,
+      inline,
+      mathEnabled,
+    } = use(ChatMarkdownRendererContext);
     const text = use(ChatMarkdownTextContext);
     const codeBlock = extractCodeBlock(children);
     if (!codeBlock) {
@@ -3424,26 +3423,6 @@ const CHAT_MARKDOWN_COMPONENTS = {
   },
 } satisfies Components;
 
-const MarkdownCodeOrMath: NonNullable<Components["code"]> = (props) => {
-  const { inline } = use(ChatMarkdownRendererContext);
-  const math = mathKind(props.className);
-  if (!math) return CHAT_MARKDOWN_COMPONENTS.code(props);
-  return (
-    <MarkdownMath
-      tex={nodeToPlainText(props.children)}
-      display={math === "display"}
-      focusable={!inline}
-    />
-  );
-};
-
-// Only messages parsed with math enabled can typeset, so raw HTML carrying the
-// math classes stays an ordinary code element while the setting is off.
-const CHAT_MARKDOWN_MATH_COMPONENTS = {
-  ...CHAT_MARKDOWN_COMPONENTS,
-  code: MarkdownCodeOrMath,
-} satisfies Components;
-
 function ChatMarkdown({
   text,
   className,
@@ -3465,17 +3444,17 @@ function ChatMarkdown({
     props.isStreaming === true &&
     extraRemarkPlugins.length === 0 &&
     /(?:^|\n) {0,3}(?:`{3}|~{3})/.test(text);
-  const math =
-    useClientSettings((settings) => settings.mathRenderingEnabled) && mayContainMath(text);
   const Root = inline ? "span" : "div";
   const bindMarkdownRef = (node: HTMLElement | null) => {
     markdownRef.current = node;
   };
   const remarkPlugins = [
-    ...chatMarkdownRemarkPlugins(lineBreaks, math),
+    ...(lineBreaks ? CHAT_MARKDOWN_REMARK_PLUGINS_WITH_BREAKS : CHAT_MARKDOWN_REMARK_PLUGINS),
     ...extraRemarkPlugins,
     ...(incrementalParsing ? [createIncrementalMarkdownPlugin()] : []),
   ];
+  if (componentState.mathEnabled)
+    remarkPlugins.unshift([remarkMath, { singleDollarTextMath: true }]);
 
   return (
     <Root
@@ -3499,7 +3478,7 @@ function ChatMarkdown({
                 : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
             }
             skipHtml={false}
-            components={math ? CHAT_MARKDOWN_MATH_COMPONENTS : CHAT_MARKDOWN_COMPONENTS}
+            components={CHAT_MARKDOWN_COMPONENTS}
             urlTransform={markdownUrlTransform}
           >
             {text}
