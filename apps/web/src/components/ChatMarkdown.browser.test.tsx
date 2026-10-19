@@ -968,6 +968,20 @@ describe("ChatMarkdown math", () => {
     expect(streamed.host.textContent).toContain("x_i^2");
   });
 
+  it.each(["$$\nx^2\n", "\\[\nx^2\n"])(
+    "keeps unfinished display %s and following prose readable while streaming",
+    async (source) => {
+      for (const text of [source, `${source}\nFollowing prose.`]) {
+        const { host } = await renderMath(text, { isStreaming: true });
+        expect(host.querySelector(".katex")).toBeNull();
+        expect(host.querySelector("[data-markdown-math]")).toBeNull();
+        expect(host.textContent).toContain("x^2");
+        if (text.includes("Following prose."))
+          expect(host.textContent).toContain("Following prose.");
+      }
+    },
+  );
+
   it.each(["$$x^2$$", "$$\nx^2\n$$", "\\[\nx^2\n\\]", "```math\nx^2\n```"])(
     "renders completed %s while the response is streaming",
     async (source) => {
