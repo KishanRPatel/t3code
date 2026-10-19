@@ -7,6 +7,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { migrationEntries, runMigrations } from "../Migrations.ts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 const layer = it.layer(Layer.mergeAll(NodeSqliteClient.layer({ filename: ":memory:" })));
 
 layer("055_OrchestrationV2", (it) => {
@@ -147,7 +148,6 @@ layer("055_OrchestrationV2", (it) => {
 it.effect("indexes batched Codex native turns without discarding duplicate candidates", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
     yield* runMigrations({ toMigrationInclusive: 64 });
     for (const [id, driver, nativeId] of [
       ["match", "codex", "requested"],
