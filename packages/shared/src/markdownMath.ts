@@ -15,7 +15,7 @@ export function parseMarkdownWithMath(source: string) {
   return mathParser.parse(source);
 }
 
-/** Closed, parser-owned formulas with authored source for editors and native rendering. */
+/** Closed, parser-owned formulas with authored source for editors. */
 export function markdownMathRanges(source: string, tree?: Root) {
   const ranges: Array<{
     start: number;
