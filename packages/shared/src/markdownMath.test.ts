@@ -245,6 +245,44 @@ describe("chat math parsing", () => {
 });
 
 describe("math in GFM tables", () => {
+  it("renders math in link labels while retaining dollars in their destinations", () => {
+    const row = "| [norm $|x|$](https://example.com/$path) | y$ |";
+    for (const source of [`${row}\n| --- | --- |`, `| First | Second |\n| --- | --- |\n${row}`]) {
+      const tree = parse(source);
+      const table = tree.children[0];
+      expect(table?.type).toBe("table");
+      if (table?.type !== "table") throw new Error("Missing table");
+      expect(table.children.every((entry) => entry.children.length === 2)).toBe(true);
+      expect(markdownMathRanges(source, tree).map((range) => range.tex)).toEqual(["|x|"]);
+      expect(collect(tree).find((node) => node.type === "link")).toMatchObject({
+        url: "https://example.com/$path",
+      });
+    }
+  });
+
+  it.each([
+    "[a](https://example.com/$x)",
+    '[a](https://example.com "title $x")',
+    "<https://example.com/$x>",
+    "`$x`",
+    '<span title="$x">a</span>',
+  ])("preserves table separators after literal dollars in %s", (literal) => {
+    const row = `| ${literal} | y$ |`;
+    for (const source of [`${row}\n| --- | --- |`, `| First | Second |\n| --- | --- |\n${row}`]) {
+      const tree = parse(source);
+      const table = tree.children[0];
+      expect(table?.type).toBe("table");
+      if (table?.type !== "table") throw new Error("Missing table");
+      expect(table.children.every((entry) => entry.children.length === 2)).toBe(true);
+      expect(markdownMathRanges(source, tree)).toEqual([]);
+      if (literal.startsWith("[a](https://example.com/$x)")) {
+        expect(collect(tree).find((node) => node.type === "link")).toMatchObject({
+          url: "https://example.com/$x",
+        });
+      }
+    }
+  });
+
   it("retains multiline math after a prose pipe outside tables", () => {
     const source = "a | b: \\(x\n+y\\)";
     expect(formulas(source)).toEqual([["inline", "x\n+y"]]);
@@ -300,9 +338,12 @@ describe("math in GFM tables", () => {
     },
   );
 
-  it("uses GFM pipe escaping inside formulas without changing math outside tables", () => {
+  it("preserves TeX pipe commands inside and outside tables", () => {
     const source = "| Formula |\n| --- |\n| \\(\\|x\\|\\) |\n\n\\(\\|x\\|\\)";
-    expect(markdownMathRanges(source).map((formula) => formula.tex)).toEqual(["|x|", "\\|x\\|"]);
+    expect(markdownMathRanges(source).map((formula) => formula.tex)).toEqual([
+      "\\|x\\|",
+      "\\|x\\|",
+    ]);
   });
 
   it("leaves code, URLs, incomplete math, and private-use text unchanged", () => {

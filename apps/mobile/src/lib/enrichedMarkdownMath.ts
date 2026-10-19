@@ -10,18 +10,25 @@ import {
 function mathOnOneLine(tex: string): string {
   let result = "";
   let slashes = 0;
+  let controlWord = false;
   for (let index = 0; index < tex.length; index++) {
     const char = tex[index]!;
     if (char === "%" && slashes % 2 === 0) {
-      index = tex.indexOf("\n", index);
-      if (index === -1) break;
+      while (index < tex.length && tex[index] !== "\r" && tex[index] !== "\n") index++;
+      if (index === tex.length) break;
+      if (tex[index] === "\r" && tex[index + 1] === "\n") index++;
+      // A comment ends a control word even though its line ending is discarded.
+      if (controlWord) result += " ";
       slashes = 0;
+      controlWord = false;
       continue;
     }
+    const letter = (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
+    controlWord = letter && (controlWord || slashes % 2 === 1);
     result += char;
     slashes = char === "\\" ? slashes + 1 : 0;
   }
-  return result.replace(/\s*\n\s*/g, " ");
+  return result.replace(/\s*[\r\n]\s*/g, " ");
 }
 
 /** MD4C accepts dollar delimiters. Keep its native layout and rendering, while

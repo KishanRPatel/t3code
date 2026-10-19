@@ -14,6 +14,16 @@ describe("native Enriched math input", () => {
       "$$x+y \\% \\\\+z$$",
     );
   });
+  it.each(["\n", "\r\n", "\r"])("preserves formulas after comments with %j endings", (eol) => {
+    expect(enrichedMarkdownWithMath(`$$${eol}x${eol}+y${eol}$$`)).toBe("$$x +y$$");
+    expect(enrichedMarkdownWithMath(`$$${eol}x% comment${eol}+y${eol}$$`)).toBe("$$x+y$$");
+    expect(enrichedMarkdownWithMath(`$$${eol}\\alpha% comment${eol}x${eol}$$`)).toBe(
+      "$$\\alpha x$$",
+    );
+    expect(enrichedMarkdownWithMath(`$$${eol}\\text{a% comment${eol}b}${eol}$$`)).toBe(
+      "$$\\text{ab}$$",
+    );
+  });
   it("keeps paragraph-to-table breaks while normalizing formulas", () => {
     const source = "Intro\n| Name | Formula |\n| --- | --- |\n| Norm | \\(x\\) |";
     expect(enrichedMarkdownWithMath(markdownWithTableBreaks(markdownWithHtml(source)))).toBe(
@@ -46,13 +56,13 @@ describe("native Enriched math input", () => {
     const source = "`$x$` \\$5 [site](https://example.com/$path)\n\n```js\nconst x = '$a$';\n```";
     expect(enrichedMarkdownWithMath(source)).toBe(source);
   });
-  it("normalizes table math and retains raw pipes for the native parser", () => {
+  it("retains raw pipes and TeX pipe commands for the native parser", () => {
     expect(
       enrichedMarkdownWithMath(
         "| Name | Formula |\n|---|---|\n| Norm | \\(|x|\\) |\n| Escaped | $\\|y\\|$ |\n| Display | $$a+b$$ |",
       ),
     ).toBe(
-      "| Name | Formula |\n|---|---|\n| Norm | $|x|$ |\n| Escaped | $|y|$ |\n| Display | $a+b$ |",
+      "| Name | Formula |\n|---|---|\n| Norm | $|x|$ |\n| Escaped | $\\|y\\|$ |\n| Display | $a+b$ |",
     );
   });
   it("keeps unfinished fences as code", () => {

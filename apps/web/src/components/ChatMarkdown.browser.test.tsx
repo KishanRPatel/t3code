@@ -930,8 +930,14 @@ describe("ChatMarkdown math", () => {
     const table = rendered.host.querySelector("table")!;
     expect([...table.rows].map((row) => row.cells.length)).toEqual([2, 2, 2]);
     expect(table.querySelectorAll(".katex")).toHaveLength(2);
+    const norm = table.querySelectorAll(".katex")[1]!;
+    expect([...norm.querySelectorAll(".katex-mathml mi")].map((node) => node.textContent)).toEqual([
+      "∥",
+      "y",
+      "∥",
+    ]);
     expect(serializeTableElementToCsv(table)).toBe(
-      "Name,Formula\nNorm,\\(|x|\\) and \\(|y|\\)\nPrice,$5 and $10",
+      "Name,Formula\nNorm,\\(|x|\\) and \\(\\|y\\|\\)\nPrice,$5 and $10",
     );
     const glyph = table.querySelector(".katex-mathml mi")!.firstChild!;
     const range = document.createRange();
@@ -961,6 +967,15 @@ describe("ChatMarkdown math", () => {
     expect(streamed.host.querySelector(".katex")).toBeNull();
     expect(streamed.host.textContent).toContain("x_i^2");
   });
+
+  it.each(["$$x^2$$", "$$\nx^2\n$$", "\\[\nx^2\n\\]", "```math\nx^2\n```"])(
+    "renders completed %s while the response is streaming",
+    async (source) => {
+      const { host } = await renderMath(source, { isStreaming: true });
+      expect(host.querySelectorAll(".katex")).toHaveLength(1);
+      expect(host.querySelector('[data-markdown-math="display"]')).not.toBeNull();
+    },
+  );
 
   it("shows unsupported TeX as source and keeps active TeX commands inert", async () => {
     const rendered = await renderMath(

@@ -3337,7 +3337,11 @@ const CHAT_MARKDOWN_COMPONENTS = {
     }
 
     const language = extractFenceLanguage(codeBlock.className);
-    if (mathEnabled && language === "math" && (!isStreaming || isClosedCodeFence(node, text))) {
+    if (
+      mathEnabled &&
+      language === "math" &&
+      (!isStreaming || mathKind(codeBlock.className) === "display" || isClosedCodeFence(node, text))
+    ) {
       return <MarkdownMath tex={codeBlock.code} display focusable={!inline} />;
     }
     const fenceTitle = extractFenceTitle(extractPreCodeMeta(node));
