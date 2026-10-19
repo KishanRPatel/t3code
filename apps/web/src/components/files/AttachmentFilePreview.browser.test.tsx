@@ -10,6 +10,7 @@ vi.mock(import("~/assets/assetUrls"), async (original) => ({
   useAssetUrlRefresh: () => refresh,
 }));
 // The real source view highlights through a worker pool; the text it receives is what matters here.
+// Never load the original: its highlighter graph can outlast waitFor on a cold CI browser.
 vi.mock(import("./ReadOnlySourcePreview"), () => ({
   default: ({ text }: { text: string }) => <pre>{text}</pre>,
 }));
@@ -23,9 +24,7 @@ describe("attachment HTML preview recovery", () => {
   let root: Root;
   let container: HTMLDivElement;
 
-  beforeEach(async () => {
-    // A cold lazy import can outlast the assertion window on busy CI runners.
-    await import("./ReadOnlySourcePreview");
+  beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     now = 0;
     vi.spyOn(Date, "now").mockImplementation(() => now);
