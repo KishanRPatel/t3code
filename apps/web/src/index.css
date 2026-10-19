@@ -2110,12 +2110,6 @@ code {
   overflow: visible;
 }
 
-.chat-markdown .chat-markdown-table-container [data-markdown-math],
-.chat-markdown .chat-markdown-table-container .chat-markdown-math-viewport {
-  max-width: none;
-  overflow: visible;
-}
-
 :root {
   --diff-addition: var(--success);
   --diff-deletion: var(--destructive);
